@@ -1,0 +1,2 @@
+# trans_MTHv2_to_PaddleOCR
+将MTHv2数据集转换为适用于PaddleOCR的格式
