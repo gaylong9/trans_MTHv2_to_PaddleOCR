@@ -23,29 +23,28 @@ def set_logger() -> logging.Logger:
     """
     设置日志：文件日志在当前目录/log/<date>、终端打印
     """
-    project_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+    global logger
 
     # 创建日志目录
-    if not os.path.exists(project_path + "/log"):
-        os.mkdir(project_path + '/log')
+    if not os.path.exists("./log"):
+        os.mkdir('./log')
 
-    global logger
     logger = logging.getLogger('logger')
     logger.setLevel(logging.DEBUG)
 
     # 文件日志输出DEBUG级别
-    file_handler = handlers.TimedRotatingFileHandler(filename=project_path + '/log/' + str(datetime.date.today()),
+    file_handler = handlers.TimedRotatingFileHandler(filename='./log/' + str(datetime.date.today()),
                                                      when='midnight',
                                                      interval=1,
                                                      backupCount=5,
                                                      encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(funcName)s - %(message)s'))
 
     # 终端打印输出INFO级别
     terminal_handler = logging.StreamHandler(sys.stdout)
     terminal_handler.setLevel(logging.INFO)
-    terminal_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    terminal_handler.setFormatter(logging.Formatter('%(asctime)s - %(funcName)s - %(message)s'))
 
     logger.addHandler(file_handler)
     logger.addHandler(terminal_handler)
@@ -56,11 +55,11 @@ def set_logger() -> logging.Logger:
 logger = set_logger()
 
 
-def build_det_mthv2(dataset_root_dir:str) -> None:
+def build_det_mthv2(dataset_root_dir: str) -> None:
     """
     构建paddleocr检测所需的数据集
 
-    :param dataset_root_dir: MTHV2的绝对路径，其下应有MTH1200、MTH1000、TKH三个目录
+    :param dataset_root_dir: MTHv2的绝对路径，其下应有MTH1200、MTH1000、TKH三个目录
     """
     dataset_names = os.listdir(dataset_root_dir)
     assert len(dataset_names) == 3
@@ -136,11 +135,11 @@ def build_det_mthv2(dataset_root_dir:str) -> None:
             label_file.close()
 
 
-def build_rec_mthv2(dataset_root_dir:str) -> None:
+def build_rec_mthv2(dataset_root_dir: str) -> None:
     """
     构建paddleocr识别所需的数据集
 
-    :param dataset_root_dir: MTHV2的绝对路径，其下应有MTH1200、MTH1000、TKH三个目录
+    :param dataset_root_dir: MTHv2的绝对路径，其下应有MTH1200、MTH1000、TKH三个目录
     """
     dataset_names = os.listdir(dataset_root_dir)
     assert len(dataset_names) == 3
@@ -253,7 +252,53 @@ def build_rec_mthv2(dataset_root_dir:str) -> None:
             label_file.close()
 
 
-def test_rec_img(img_path:str, raw_locations:list) -> None:
+def generate_rec_dict(dataset_root_dir: str) -> None:
+    """
+    生成数据集的字典文件
+    生成位置如：dataset_root_dir/MTH1200/dict.txt
+
+    :param dataset_root_dir: MTHv2的绝对路径，其下应有MTH1200、MTH1000、TKH三个目录
+    """
+    dataset_names = os.listdir(dataset_root_dir)
+    assert len(dataset_names) == 3
+    for dataset_name in dataset_names:
+        logger.info('dataset name:%s' % dataset_name)
+        dataset_dir = os.path.join(dataset_root_dir, dataset_name)
+        # 集合，数据集原始label中，不清楚的文字用'#'代表
+        dict_set = {'#', }
+        # 逐个读入text_line中的文件
+        label_textlines_dir = os.path.join(dataset_dir, 'label_textline')
+        text_files = os.listdir(label_textlines_dir)
+        cnt = 0
+        for text_file_name in text_files:
+            logger.debug(text_file_name)
+            cnt += 1
+            if cnt % 100 == 0:
+                logger.info('%d/%d' % (cnt, len(text_files)))
+            if cnt == len(text_files):
+                logger.info('%d/%d - done' % (cnt, cnt))
+
+            # 逐行读入一个label文件
+            text_file = codecs.open(os.path.join(label_textlines_dir, text_file_name), 'r', encoding='utf-8')
+            for line in text_file.readlines():
+                contents = line.strip('\n').split(',')
+                assert len(contents) == 9
+                content = contents[0]
+                # 逐字遍历文本
+                for i in range(len(content)):
+                    character = content[i]
+                    dict_set.add(character)
+
+            text_file.close()
+
+        # 生成dict.txt
+        dict_file = codecs.open(os.path.join(dataset_dir, 'dict.txt'), 'w', encoding='utf-8')
+        for character in dict_set:
+            dict_file.write(character + '\n')
+        dict_file.close()
+
+
+def test_rec_img(img_path: str, raw_locations: list) -> None:
     """
     测试分割识别数据集时遇到问题的数据
 
@@ -297,8 +342,10 @@ def test_rec_img(img_path:str, raw_locations:list) -> None:
 
 
 if __name__ == '__main__':
-    # build_det_mthv2()
-    # build_rec_mthv2()
+    dataset_root_dir = 'D:/File/Postgraduate/graduation project/OCR database/rec/TKHMTH2200'
+    # build_det_mthv2(dataset_root_dir)
+    # build_rec_mthv2(dataset_root_dir)
     # test_rec_img('D:/File/Postgraduate/graduation project/OCR database/rec/TKHMTH2200/MTH1000/img/01-V100P0656.png',
     #             [1172,1441,1095,1440,1104,145,1181,146])
+    generate_rec_dict(dataset_root_dir)
     pass
